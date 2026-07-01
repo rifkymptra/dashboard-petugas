@@ -1,7 +1,9 @@
-// src/app/page.tsx
+// app/page.tsx
 import React from 'react';
+import { kv } from '@vercel/kv';
+import TombolUpdate from './components/TombolUpdate';
 
-// 1. Definisikan tipe data objek di dalam array "data"
+// 1. Definisikan tipe data sesuai struktur API Anda
 interface PetugasData {
   draft: number;
   kdkab: string;
@@ -15,88 +17,113 @@ interface PetugasData {
   target: number;
 }
 
-// Tipe data untuk struktur root API Anda
 interface ApiResponse {
   current_level: string;
   data: PetugasData[];
+  last_update?: string;
 }
 
-// 2. Fungsi Fetch API
-async function getApiData(): Promise<PetugasData[]> {
+// 2. Fungsi untuk mengambil data LIVE (Hari Ini)
+async function getLiveApiData(): Promise<PetugasData[]> {
   try {
-    // Ganti URL ini dengan URL API asli Anda nanti
+    // PENTING: Ganti URL ini dengan API asli perusahaan Anda
     const res = await fetch('https://simpul-jabar.32net.id/api/um-rekap?kdkab=3205%20-%20KAB.%20GARUT&kdkec=&kdkel=&level_view=PETUGAS', {
       cache: 'no-store',
-      // Jika butuh token, buka baris di bawah ini:
-      // headers: {
-      //   'Authorization': 'Bearer ISI_TOKEN_ANDA_DI_SINI',
-      //   'Content-Type': 'application/json'
-      // }
     });
-
-    if (!res.ok) {
-      throw new Error(`Gagal mengambil data! Status: ${res.status}`);
-    }
-
-    const result: ApiResponse = await res.json();
     
-    // Karena data asli berada di dalam properti "data", kita return result.data
-    return result.data || []; 
-
+    if (!res.ok) throw new Error('Gagal mengambil API utama');
+    
+    const result: ApiResponse = await res.json();
+    return result.data || [];
   } catch (error) {
-    console.error("Error Fetch API:", error);
-    return []; // Kembalikan array kosong jika gagal agar tidak crash
+    console.error("Error getLiveApiData:", error);
+    return [];
   }
 }
 
-// 3. Komponen Utama
+// 3. Komponen Utama Halaman
 export default async function DashboardPage() {
-  const rawData = await getApiData();
+  // Ambil data Live (H)
+  const dataHariIni = await getLiveApiData();
+  
+  // Ambil data Kemarin (H-1) dari database Redis
+  // Karena kita menyimpannya sebagai string, kv.get otomatis mengubahnya kembali jadi Array Object
+  const dataKemarin: PetugasData[] | null = await kv.get('data_kemarin');
 
-  // Sesuai rencana, sekarang kita langsung pakai data mentah dulu agar tampil.
-  // Modifikasi tampilan atau kalkulasi tabel bisa kita lakukan setelah ini.
-  const processedData = rawData;
+  // 4. Proses Penggabungan dan Kalkulasi Selisih
+  const processedData = dataHariIni.map((rowH) => {
+    // Cari petugas yang sama di data kemarin berdasarkan ID unik (kdkab / email)
+    const rowH1 = dataKemarin?.find((k) => k.kdkab === rowH.kdkab);
 
+    // Jika ketemu, pakai angka kemarin. Jika petugas baru, anggap kemarin 0.
+    const pendataanH1 = rowH1 ? rowH1.pendataan : 0;
+    const submitH1 = rowH1 ? rowH1.submit : 0;
+
+    return {
+      ...rowH,
+      pendataanH1,
+      selisihPendataan: rowH.pendataan - pendataanH1,
+      submitH1,
+      selisihSubmit: rowH.submit - submitH1,
+    };
+  });
+
+  // 5. Render Tampilan
   return (
     <main className="p-8 font-sans bg-gray-50 min-h-screen">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">Data Progres Petugas</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Dashboard Progres Petugas</h1>
+        <TombolUpdate />
+      </div>
       
       <div className="overflow-x-auto shadow-sm rounded-lg border border-gray-200">
-        <table className="min-w-full bg-white">
+        <table className="min-w-full bg-white text-center">
           <thead className="bg-gray-100 text-gray-700 text-xs uppercase tracking-wider">
+            {/* Baris Header Atas */}
             <tr>
-              <th className="py-3 px-4 border-b text-left">Nama Petugas</th>
-              <th className="py-3 px-4 border-b text-left">Email / Kdkab</th>
-              <th className="py-3 px-4 border-b text-left">No. Telp</th>
-              <th className="py-3 px-4 border-b text-center">Target</th>
-              <th className="py-3 px-4 border-b text-center">Pendataan</th>
-              <th className="py-3 px-4 border-b text-center">Submit</th>
-              <th className="py-3 px-4 border-b text-center">Draft</th>
-              <th className="py-3 px-4 border-b text-center">Open Val</th>
-              <th className="py-3 px-4 border-b text-center">Persentase</th>
+              <th rowSpan={2} className="py-3 px-4 border text-left">Nama Petugas</th>
+              <th rowSpan={2} className="py-3 px-4 border text-left">Email / Kdkab</th>
+              <th colSpan={3} className="py-2 px-4 border bg-blue-50 text-blue-800">Pendataan</th>
+              <th colSpan={3} className="py-2 px-4 border bg-green-50 text-green-800">Submit</th>
+              <th rowSpan={2} className="py-3 px-4 border">Persentase</th>
+            </tr>
+            {/* Baris Header Bawah (Sub-kolom) */}
+            <tr>
+              <th className="py-2 px-2 border bg-blue-50 text-[11px]">H-1</th>
+              <th className="py-2 px-2 border bg-blue-50 text-[11px]">Hari Ini</th>
+              <th className="py-2 px-2 border bg-blue-50 text-[11px]">Selisih</th>
+              
+              <th className="py-2 px-2 border bg-green-50 text-[11px]">H-1</th>
+              <th className="py-2 px-2 border bg-green-50 text-[11px]">Hari Ini</th>
+              <th className="py-2 px-2 border bg-green-50 text-[11px]">Selisih</th>
             </tr>
           </thead>
           <tbody className="text-gray-600 text-sm">
             {processedData.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-gray-400">
-                  Tidak ada data atau gagal terhubung ke API.
-                </td>
+                <td colSpan={9} className="py-8 text-center text-gray-400">Sedang memuat atau tidak ada data...</td>
               </tr>
             ) : (
               processedData.map((row, index) => (
                 <tr key={index} className="hover:bg-gray-50 border-b border-gray-100">
-                  <td className="py-3 px-4 font-medium text-gray-900">{row.nama_petugas}</td>
-                  <td className="py-3 px-4 text-xs text-gray-500">{row.kdkab}</td>
-                  <td className="py-3 px-4 text-xs">{row.no_telp}</td>
-                  <td className="py-3 px-4 text-center">{row.target}</td>
-                  <td className="py-3 px-4 text-center">{row.pendataan}</td>
-                  <td className="py-3 px-4 text-center">{row.submit}</td>
-                  <td className="py-3 px-4 text-center">{row.draft}</td>
-                  <td className="py-3 px-4 text-center">{row.open_val}</td>
-                  <td className="py-3 px-4 text-center font-semibold text-blue-600">
-                    {row.percentage}%
+                  <td className="py-3 px-4 border text-left font-medium text-gray-900">{row.nama_petugas}</td>
+                  <td className="py-3 px-4 border text-left text-xs text-gray-500">{row.kdkab}</td>
+                  
+                  {/* Kolom Pendataan */}
+                  <td className="py-3 px-2 border text-gray-400">{row.pendataanH1}</td>
+                  <td className="py-3 px-2 border font-medium text-black">{row.pendataan}</td>
+                  <td className={`py-3 px-2 border font-bold ${row.selisihPendataan > 0 ? 'text-green-600' : row.selisihPendataan < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                    {row.selisihPendataan > 0 ? `+${row.selisihPendataan}` : row.selisihPendataan}
                   </td>
+
+                  {/* Kolom Submit */}
+                  <td className="py-3 px-2 border text-gray-400">{row.submitH1}</td>
+                  <td className="py-3 px-2 border font-medium text-black">{row.submit}</td>
+                  <td className={`py-3 px-2 border font-bold ${row.selisihSubmit > 0 ? 'text-green-600' : row.selisihSubmit < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                    {row.selisihSubmit > 0 ? `+${row.selisihSubmit}` : row.selisihSubmit}
+                  </td>
+                  
+                  <td className="py-3 px-4 border font-semibold text-blue-600">{row.percentage}%</td>
                 </tr>
               ))
             )}
