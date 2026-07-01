@@ -12,26 +12,25 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 1. Tarik data dari API Anda
-    // UBAH URL INI DENGAN API ASLI PERUSAHAAN ANDA
     const res = await fetch('https://api.perusahaan-anda.com/endpoint-datanya', { 
-      cache: 'no-store' 
+        cache: 'no-store' 
     });
     
     if (!res.ok) throw new Error('Gagal mengambil data dari API utama');
     
     const jsonData = await res.json();
-
-    // 2. Ambil bagian array "data"-nya saja sesuai struktur API Anda
     const liveData = jsonData.data; 
 
-    // 3. Simpan ke Database Redis dengan nama "data_kemarin"
-    await kv.set('data_kemarin', JSON.stringify(liveData));
+    // --- LOGIKA BARU: Simpan dengan key tanggal hari ini ---
+    const today = new Date().toISOString().split('T')[0]; // Menghasilkan "2026-07-01"
+    const key = `data_${today}`;
+    
+    await kv.set(key, JSON.stringify(liveData));
 
     return NextResponse.json({ 
-      success: true, 
-      message: 'Berhasil! Data hari ini sudah disimpan sebagai data H-1 di Redis.',
-      jumlahDataDisimpan: liveData?.length || 0
+        success: true, 
+        message: `Data berhasil disimpan dengan key: ${key}`,
+        jumlahDataDisimpan: liveData?.length || 0
     });
 
   } catch (error) {

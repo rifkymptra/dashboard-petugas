@@ -1,135 +1,116 @@
 // app/page.tsx
 import React from 'react';
 import { kv } from '@vercel/kv';
-import TombolUpdate from './components/TombolUpdate';
+import masterDataRaw from './data/Master SLS.json'; 
+import FilterWilayah from './components/FilterWilayah';
+import TabelProgres, { DataTabel } from './components/TabelProgres';
 
-// 1. Definisikan tipe data sesuai struktur API Anda
 interface PetugasData {
-  draft: number;
-  kdkab: string;
   nama_petugas: string;
-  no_telp: string;
-  open_val: number;
+  kdkab: string;
+  target: number; // Mengambil target dari API
   pendataan: number;
-  percentage: number;
-  percentage_pendataan: number;
   submit: number;
-  target: number;
+  percentage: number; 
+  percentage_pendataan: number;
 }
 
-interface ApiResponse {
-  current_level: string;
-  data: PetugasData[];
-  last_update?: string;
+interface MasterSLS {
+  nmkec: string;
+  nmdesa: string;
+  nmsls: string;
+  "Email PPL": string;
+  [key: string]: any; 
 }
 
-// 2. Fungsi untuk mengambil data LIVE (Hari Ini)
-async function getLiveApiData(): Promise<PetugasData[]> {
-  try {
-    // PENTING: Ganti URL ini dengan API asli perusahaan Anda
-    const res = await fetch('https://simpul-jabar.32net.id/api/um-rekap?kdkab=3205%20-%20KAB.%20GARUT&kdkec=&kdkel=&level_view=PETUGAS', {
-      cache: 'no-store',
-    });
-    
-    if (!res.ok) throw new Error('Gagal mengambil API utama');
-    
-    const result: ApiResponse = await res.json();
-    return result.data || [];
-  } catch (error) {
-    console.error("Error getLiveApiData:", error);
-    return [];
+const masterData = masterDataRaw as MasterSLS[];
+
+function getLatestKeys() {
+  const keys = [];
+  for (let i = 0; i < 3; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    keys.push(`data_${d.toISOString().split('T')[0]}`);
   }
+  return keys;
 }
 
-// 3. Komponen Utama Halaman
-export default async function DashboardPage() {
-  // Ambil data Live (H)
-  const dataHariIni = await getLiveApiData();
-  
-  // Ambil data Kemarin (H-1) dari database Redis
-  // Karena kita menyimpannya sebagai string, kv.get otomatis mengubahnya kembali jadi Array Object
-  const dataKemarin: PetugasData[] | null = await kv.get('data_kemarin');
+function getTargetHariIni() {
+  const hariIni = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+  const startDate = new Date('2026-06-14T00:00:00').getTime();
+  const diffTime = new Date(hariIni).getTime() - startDate;
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays * 1.70);
+}
 
-  // 4. Proses Penggabungan dan Kalkulasi Selisih
-  const processedData = dataHariIni.map((rowH) => {
-    // Cari petugas yang sama di data kemarin berdasarkan ID unik (kdkab / email)
-    const rowH1 = dataKemarin?.find((k) => k.kdkab === rowH.kdkab);
+export default async function DashboardPage({ 
+  searchParams 
+}: { 
+  searchParams: Promise<{ kec?: string, desa?: string, sls?: string }> 
+}) {
+  const keys = getLatestKeys();
+  const historyData = await kv.mget(...keys);
 
-    // Jika ketemu, pakai angka kemarin. Jika petugas baru, anggap kemarin 0.
-    const pendataanH1 = rowH1 ? rowH1.pendataan : 0;
-    const submitH1 = rowH1 ? rowH1.submit : 0;
+  const dataHariIni = (historyData[0] as PetugasData[]) || [];
+  const dataKemarin = (historyData[1] as PetugasData[]) || [];
+  const dataLusa = (historyData[2] as PetugasData[]) || [];
+
+  const params = await searchParams;
+  const selectedKec = params.kec || '';
+  const selectedDesa = params.desa || '';
+  const selectedSls = params.sls || '';
+
+  const filteredData = dataHariIni.filter((petugas) => {
+    if (!selectedKec && !selectedDesa && !selectedSls) return true;
+    return masterData.some((m) => {
+      if (m["Email PPL"] !== petugas.kdkab) return false;
+      if (selectedKec && m.nmkec !== selectedKec) return false;
+      if (selectedDesa && m.nmdesa !== selectedDesa) return false;
+      if (selectedSls && m.nmsls !== selectedSls) return false;
+      return true;
+    });
+  });
+
+  const mergedData: DataTabel[] = filteredData.map((petugas) => {
+    const pKemarin = dataKemarin?.find(p => p.kdkab === petugas.kdkab);
+    const pLusa = dataLusa?.find(p => p.kdkab === petugas.kdkab);
+
+    const pendataanLusa = pLusa?.pendataan || 0;
+    const pendataanKemarin = pKemarin?.pendataan || 0;
+    const pendataanHariIni = petugas.pendataan || 0;
+
+    const submitLusa = pLusa?.submit || 0;
+    const submitKemarin = pKemarin?.submit || 0;
+    const submitHariIni = petugas.submit || 0;
 
     return {
-      ...rowH,
-      pendataanH1,
-      selisihPendataan: rowH.pendataan - pendataanH1,
-      submitH1,
-      selisihSubmit: rowH.submit - submitH1,
+      nama_petugas: petugas.nama_petugas,
+      kdkab: petugas.kdkab, 
+      target: petugas.target || 0, // Target individu dari API
+
+      pendataanLusa,
+      pendataanKemarin,
+      naikPendataanKemarin: pendataanKemarin - pendataanLusa,
+      pendataanHariIni,
+      naikPendataanHariIni: pendataanHariIni - pendataanKemarin,
+      persentasePendataan: petugas.percentage_pendataan || 0,
+      
+      submitLusa,
+      submitKemarin,
+      naikSubmitKemarin: submitKemarin - submitLusa,
+      submitHariIni,
+      naikSubmitHariIni: submitHariIni - submitKemarin,
+      persentaseSubmit: petugas.percentage || 0,
     };
   });
 
-  // 5. Render Tampilan
+  const targetHariIni = getTargetHariIni();
+
   return (
     <main className="p-8 font-sans bg-gray-50 min-h-screen">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Dashboard Progres Petugas</h1>
-        <TombolUpdate />
-      </div>
-      
-      <div className="overflow-x-auto shadow-sm rounded-lg border border-gray-200">
-        <table className="min-w-full bg-white text-center">
-          <thead className="bg-gray-100 text-gray-700 text-xs uppercase tracking-wider">
-            {/* Baris Header Atas */}
-            <tr>
-              <th rowSpan={2} className="py-3 px-4 border text-left">Nama Petugas</th>
-              <th rowSpan={2} className="py-3 px-4 border text-left">Email / Kdkab</th>
-              <th colSpan={3} className="py-2 px-4 border bg-blue-50 text-blue-800">Pendataan</th>
-              <th colSpan={3} className="py-2 px-4 border bg-green-50 text-green-800">Submit</th>
-              <th rowSpan={2} className="py-3 px-4 border">Persentase</th>
-            </tr>
-            {/* Baris Header Bawah (Sub-kolom) */}
-            <tr>
-              <th className="py-2 px-2 border bg-blue-50 text-[11px]">H-1</th>
-              <th className="py-2 px-2 border bg-blue-50 text-[11px]">Hari Ini</th>
-              <th className="py-2 px-2 border bg-blue-50 text-[11px]">Selisih</th>
-              
-              <th className="py-2 px-2 border bg-green-50 text-[11px]">H-1</th>
-              <th className="py-2 px-2 border bg-green-50 text-[11px]">Hari Ini</th>
-              <th className="py-2 px-2 border bg-green-50 text-[11px]">Selisih</th>
-            </tr>
-          </thead>
-          <tbody className="text-gray-600 text-sm">
-            {processedData.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="py-8 text-center text-gray-400">Sedang memuat atau tidak ada data...</td>
-              </tr>
-            ) : (
-              processedData.map((row, index) => (
-                <tr key={index} className="hover:bg-gray-50 border-b border-gray-100">
-                  <td className="py-3 px-4 border text-left font-medium text-gray-900">{row.nama_petugas}</td>
-                  <td className="py-3 px-4 border text-left text-xs text-gray-500">{row.kdkab}</td>
-                  
-                  {/* Kolom Pendataan */}
-                  <td className="py-3 px-2 border text-gray-400">{row.pendataanH1}</td>
-                  <td className="py-3 px-2 border font-medium text-black">{row.pendataan}</td>
-                  <td className={`py-3 px-2 border font-bold ${row.selisihPendataan > 0 ? 'text-green-600' : row.selisihPendataan < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                    {row.selisihPendataan > 0 ? `+${row.selisihPendataan}` : row.selisihPendataan}
-                  </td>
-
-                  {/* Kolom Submit */}
-                  <td className="py-3 px-2 border text-gray-400">{row.submitH1}</td>
-                  <td className="py-3 px-2 border font-medium text-black">{row.submit}</td>
-                  <td className={`py-3 px-2 border font-bold ${row.selisihSubmit > 0 ? 'text-green-600' : row.selisihSubmit < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                    {row.selisihSubmit > 0 ? `+${row.selisihSubmit}` : row.selisihSubmit}
-                  </td>
-                  
-                  <td className="py-3 px-4 border font-semibold text-blue-600">{row.percentage}%</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <h1 className="text-2xl font-bold mb-6 text-gray-800">Progres 3 Hari Terakhir</h1>
+      <FilterWilayah kec={selectedKec} desa={selectedDesa} sls={selectedSls} />
+      <TabelProgres data={mergedData} targetHariIni={targetHariIni} />
     </main>
   );
 }
