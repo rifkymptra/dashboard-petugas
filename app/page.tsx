@@ -46,6 +46,19 @@ function getTargetHariIni() {
   return Math.max(0, diffDays * 1.70);
 }
 
+// Pastikan interface MasterSLS memiliki properti "Nama PPL"
+interface MasterSLS {
+  nmkec: string;
+  nmdesa: string;
+  "Nama PML": string;
+  "Email PML"?: string; 
+  "Nama PPL"?: string; // Asumsi ada kolom nama PPL di master
+  "Email PPL": string;
+  [key: string]: any; 
+}
+
+// ... (kode fungsi getLatestKeys & getTargetHariIni tetap sama) ...
+
 export default async function DashboardPage({ 
   searchParams 
 }: { 
@@ -69,23 +82,8 @@ export default async function DashboardPage({
   const selectedDesa = params.desa || '';
   const selectedPml = params.pml || '';
 
-  const filteredData = d0.filter((petugas) => {
-    if (!selectedKec && !selectedDesa && !selectedPml) return true;
-    return masterData.some((m) => {
-      if (m["Email PPL"] !== petugas.kdkab) return false;
-      const cleanKec = m.nmkec ? String(m.nmkec).trim().toUpperCase() : '';
-      const cleanDesa = m.nmdesa ? String(m.nmdesa).trim().toUpperCase() : '';
-      const cleanPml = m["Nama PML"] ? String(m["Nama PML"]).trim().toUpperCase() : '';
-
-      if (selectedKec && cleanKec !== selectedKec) return false;
-      if (selectedDesa && cleanDesa !== selectedDesa) return false;
-      if (selectedPml && cleanPml !== selectedPml) return false;
-      return true;
-    });
-  });
-
-  // 1. DATA UNTUK LEVEL PPL
-  const mergedDataPPL: DataTabel[] = filteredData.map((petugas) => {
+  // 1. TAHAP JOIN: Gabungkan & Perkaya Data Dulu Tanpa Filter
+  const enrichedData = d0.map((petugas) => {
     const p1 = d1.find(p => p.kdkab === petugas.kdkab);
     const p2 = d2.find(p => p.kdkab === petugas.kdkab);
     const p3 = d3.find(p => p.kdkab === petugas.kdkab);
@@ -107,17 +105,29 @@ export default async function DashboardPage({
 
     const totalSubmit = petugas.submit || 0;
     const totalDraft = petugas.draft || 0;
-
     const target = petugas.target || 0;
     const reject = Math.max(0, c0 - totalSubmit - totalDraft);
 
-    // Cari info PML dari master data
-    const masterInfo = masterData.find(m => m["Email PPL"] === petugas.kdkab);
+    // Cari info di Master SLS (Kebal Huruf Besar/Kecil & Spasi)
+    const masterInfo = masterData.find(m => 
+      m["Email PPL"] && 
+      petugas.kdkab && 
+      String(m["Email PPL"]).trim().toLowerCase() === String(petugas.kdkab).trim().toLowerCase()
+    );
+
+    // Ambil Atribut Wilayah untuk keperluan filter nanti
+    const nmkec = masterInfo?.nmkec ? String(masterInfo.nmkec).trim().toUpperCase() : "";
+    const nmdesa = masterInfo?.nmdesa ? String(masterInfo.nmdesa).trim().toUpperCase() : "";
     const nama_pml = masterInfo?.["Nama PML"] ? String(masterInfo["Nama PML"]).trim().toUpperCase() : "TIDAK DIKETAHUI";
     const email_pml = masterInfo?.["Email PML"] ? String(masterInfo["Email PML"]).trim() : "-";
 
+    // LOGIKA PRIORITAS NAMA PPL (Master -> API -> Default)
+    const namaPPLMaster = masterInfo?.["Nama PPL"] ? String(masterInfo["Nama PPL"]).trim() : null;
+    const namaAPI = petugas.nama_petugas ? String(petugas.nama_petugas).trim() : null;
+    const finalNamaPPL = namaPPLMaster || namaAPI || "TANPA NAMA (CEK MASTER)";
+
     return {
-      nama_petugas: petugas.nama_petugas,
+      nama_petugas: finalNamaPPL,
       kdkab: petugas.kdkab, 
       target,
       h4, h3, h2, h1, h0,
@@ -130,17 +140,28 @@ export default async function DashboardPage({
       pctTotal: petugas.percentage_pendataan || 0,
       nama_pml,
       email_pml,
-      reject
+      reject,
+      // Field rahasia untuk mempermudah filter
+      _kec: nmkec,
+      _desa: nmdesa
     };
   });
 
-  // 2. DATA UNTUK LEVEL PML (Menggabungkan/Akumulasi data PPL di atas)
+  // 2. TAHAP FILTER: Setelah Data Lengkap
+  const mergedDataPPL = enrichedData.filter(item => {
+    if (selectedKec && item._kec !== selectedKec) return false;
+    if (selectedDesa && item._desa !== selectedDesa) return false;
+    if (selectedPml && item.nama_pml !== selectedPml) return false;
+    return true;
+  });
+
+  // 3. DATA UNTUK LEVEL PML (Sama persis seperti sebelumnya)
   const pmlMap = new Map<string, DataTabel>();
   mergedDataPPL.forEach(ppl => {
     const key = ppl.nama_pml || "TIDAK DIKETAHUI";
     if (!pmlMap.has(key)) {
       pmlMap.set(key, {
-        nama_petugas: key, // Di tabel PML, kolom nama akan berisi Nama PML
+        nama_petugas: key, 
         kdkab: ppl.email_pml && ppl.email_pml !== "-" ? ppl.email_pml : "Pengawas (PML)",
         target: 0, h4: 0, h3: 0, h2: 0, h1: 0, h0: 0, totalPendataan: 0,
         pct4: 0, pct3: 0, pct2: 0, pct1: 0, pct0: 0, pctTotal: 0, reject:0
@@ -154,10 +175,9 @@ export default async function DashboardPage({
     pml.h1 += ppl.h1;
     pml.h0 += ppl.h0;
     pml.totalPendataan += ppl.totalPendataan;
-    pml.reject += ppl.reject;
+    pml.reject += ppl.reject; 
   });
 
-  // Hitung ulang persentase untuk PML dari total kumulatifnya
   const mergedDataPML: DataTabel[] = Array.from(pmlMap.values()).map(pml => {
     pml.pct4 = pml.target > 0 ? (pml.h4 / pml.target) * 100 : 0;
     pml.pct3 = pml.target > 0 ? (pml.h3 / pml.target) * 100 : 0;
@@ -170,6 +190,7 @@ export default async function DashboardPage({
 
   const targetHariIni = getTargetHariIni();
 
+  // ... (return JSX tetap sama) ...
   return (
     <div className="min-h-screen bg-slate-50 font-sans" suppressHydrationWarning>
       <Header />
