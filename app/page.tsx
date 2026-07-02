@@ -154,6 +154,7 @@ export default async function DashboardPage({
     pml.h1 += ppl.h1;
     pml.h0 += ppl.h0;
     pml.totalPendataan += ppl.totalPendataan;
+    pml.reject += ppl.reject;
   });
 
   // Hitung ulang persentase untuk PML dari total kumulatifnya
