@@ -170,7 +170,7 @@ export default function TabelProgres({ data, targetHariIni, lastUpdate }: Props)
       {/* BARIS KONTROL: Legenda, Pencarian, & Export */}
       <div className="mb-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         
-        {/* Keterangan Warna */}
+        {/* Keterangan Warnanya */}
         <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-100/70 border border-slate-200 px-3 py-1.5 rounded-lg w-fit">
             <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
