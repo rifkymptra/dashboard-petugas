@@ -56,8 +56,8 @@ export default function TabelProgres({ dataPPL, dataPML, targetHariIni, lastUpda
     setSortConfig({ key: direction ? key : null, direction });
   };
 
-  const processedData = useMemo(() => {
-    let result = activeData; // Gunakan activeData (PPL atau PML)
+const processedData = useMemo(() => {
+    let result = activeData;
     
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -69,10 +69,12 @@ export default function TabelProgres({ dataPPL, dataPML, targetHariIni, lastUpda
 
     if (sortConfig.direction && sortConfig.key) {
       result = [...result].sort((a, b) => {
-        const aValue = a[sortConfig.key as keyof DataTabel];
-        const bValue = b[sortConfig.key as keyof DataTabel];
-        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        // PERBAIKAN: Beri nilai fallback '' jika undefined, dan gunakan 'as any'
+        const aValue = a[sortConfig.key as keyof DataTabel] ?? '';
+        const bValue = b[sortConfig.key as keyof DataTabel] ?? '';
+        
+        if ((aValue as any) < (bValue as any)) return sortConfig.direction === 'asc' ? -1 : 1;
+        if ((aValue as any) > (bValue as any)) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
       });
     }
