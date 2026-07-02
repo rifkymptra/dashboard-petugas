@@ -149,11 +149,13 @@ export default async function DashboardPage({
 
   // 2. TAHAP FILTER: Setelah Data Lengkap
   const mergedDataPPL = enrichedData.filter(item => {
-    if (selectedKec && item._kec !== selectedKec) return false;
-    if (selectedDesa && item._desa !== selectedDesa) return false;
-    if (selectedPml && item.nama_pml !== selectedPml) return false;
-    return true;
-  });
+  // Pastikan perbandingan wilayah juga pakai .toLowerCase() jika perlu, 
+  // tapi biasanya email saja sudah cukup untuk mengunci relasi
+  if (selectedKec && item._kec.toLowerCase() !== selectedKec.toLowerCase()) return false;
+  if (selectedDesa && item._desa.toLowerCase() !== selectedDesa.toLowerCase()) return false;
+  if (selectedPml && item.nama_pml.toLowerCase() !== selectedPml.toLowerCase()) return false;
+  return true;
+});
 
   // 3. DATA UNTUK LEVEL PML (Sama persis seperti sebelumnya)
   const pmlMap = new Map<string, DataTabel>();

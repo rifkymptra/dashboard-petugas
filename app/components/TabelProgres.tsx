@@ -365,20 +365,20 @@ export default function TabelProgres({ dataPPL, dataPML, targetHariIni, lastUpda
                 <th rowSpan={2} onClick={() => handleSort('target')} className="py-4 px-2 hover:bg-slate-100 transition-colors align-middle border-r border-slate-200">
                   Target{renderSortIndicator('target')}
                 </th>
-                <th colSpan={5} className="py-2 border-r border-slate-200 bg-blue-50/50 text-blue-800">Pendataan Harian</th>
+                <th colSpan={4} className="py-2 border-r border-slate-200 bg-blue-50/50 text-blue-800">Pendataan Harian</th>
                 <th rowSpan={2} onClick={() => handleSort('totalPendataan')} className="py-3 px-2 bg-blue-100/50 hover:bg-blue-200/50 transition-colors text-blue-900 border-r border-slate-200">Total{renderSortIndicator('totalPendataan')}</th>
-                <th colSpan={5} className="py-2 bg-emerald-50/50 text-emerald-800">Persentase Harian (%)</th>
+                <th colSpan={4} className="py-2 bg-emerald-50/50 text-emerald-800">Persentase Harian (%)</th>
                 <th rowSpan={2} onClick={() => handleSort('pctTotal')} className="py-3 px-2 bg-emerald-100/50 hover:bg-emerald-200/50 transition-colors text-emerald-900">Total %{renderSortIndicator('pctTotal')}</th>
                 <th rowSpan={2} onClick={() => handleSort('reject')} className="py-3 px-2 bg-rose-100/50 hover:bg-rose-200/50 transition-colors text-rose-900 border-l border-slate-200">Reject{renderSortIndicator('reject')}</th>
               </tr>
               <tr className="border-t border-slate-200">
-                <th onClick={() => handleSort('h4')} className="py-3 px-2 bg-blue-50/50 hover:bg-blue-100/50 transition-colors">H-4{renderSortIndicator('h4')}</th>
+                {/* <th onClick={() => handleSort('h4')} className="py-3 px-2 bg-blue-50/50 hover:bg-blue-100/50 transition-colors">H-4{renderSortIndicator('h4')}</th> */}
                 <th onClick={() => handleSort('h3')} className="py-3 px-2 bg-blue-50/50 hover:bg-blue-100/50 transition-colors">H-3{renderSortIndicator('h3')}</th>
                 <th onClick={() => handleSort('h2')} className="py-3 px-2 bg-blue-50/50 hover:bg-blue-100/50 transition-colors">H-2{renderSortIndicator('h2')}</th>
                 <th onClick={() => handleSort('h1')} className="py-3 px-2 bg-blue-50/50 hover:bg-blue-100/50 transition-colors">H-1{renderSortIndicator('h1')}</th>
                 <th onClick={() => handleSort('h0')} className="py-3 px-2 bg-blue-50/50 hover:bg-blue-100/50 transition-colors text-blue-900">Hari Ini{renderSortIndicator('h0')}</th>
 
-                <th onClick={() => handleSort('pct4')} className="py-3 px-2 bg-emerald-50/50 hover:bg-emerald-100/50 transition-colors">H-4{renderSortIndicator('pct4')}</th>
+                {/* <th onClick={() => handleSort('pct4')} className="py-3 px-2 bg-emerald-50/50 hover:bg-emerald-100/50 transition-colors">H-4{renderSortIndicator('pct4')}</th> */}
                 <th onClick={() => handleSort('pct3')} className="py-3 px-2 bg-emerald-50/50 hover:bg-emerald-100/50 transition-colors">H-3{renderSortIndicator('pct3')}</th>
                 <th onClick={() => handleSort('pct2')} className="py-3 px-2 bg-emerald-50/50 hover:bg-emerald-100/50 transition-colors">H-2{renderSortIndicator('pct2')}</th>
                 <th onClick={() => handleSort('pct1')} className="py-3 px-2 bg-emerald-50/50 hover:bg-emerald-100/50 transition-colors">H-1{renderSortIndicator('pct1')}</th>
@@ -410,14 +410,14 @@ export default function TabelProgres({ dataPPL, dataPML, targetHariIni, lastUpda
                       </td>
                       <td className="py-3 px-2 font-semibold text-slate-700 border-r border-slate-200/50 bg-inherit">{petugas.target}</td>
 
-                      {renderVolCell(petugas.h4)}
+                      {/* {renderVolCell(petugas.h4)} */}
                       {renderVolCell(petugas.h3)}
                       {renderVolCell(petugas.h2)}
                       {renderVolCell(petugas.h1)}
                       {renderVolCell(petugas.h0)}
                       <td className="py-3 px-2 font-extrabold text-slate-900 border-r border-slate-200/50 bg-black/5">{petugas.totalPendataan}</td>
 
-                      <td className="py-3 px-2 font-medium text-slate-600">{petugas.pct4 > 0 ? `${petugas.pct4.toFixed(2)}%` : '-'}</td>
+                      {/* <td className="py-3 px-2 font-medium text-slate-600">{petugas.pct4 > 0 ? `${petugas.pct4.toFixed(2)}%` : '-'}</td> */}
                       <td className="py-3 px-2 font-medium text-slate-600">{petugas.pct3 > 0 ? `${petugas.pct3.toFixed(2)}%` : '-'}</td>
                       <td className="py-3 px-2 font-medium text-slate-600">{petugas.pct2 > 0 ? `${petugas.pct2.toFixed(2)}%` : '-'}</td>
                       <td className="py-3 px-2 font-medium text-slate-600">{petugas.pct1 > 0 ? `${petugas.pct1.toFixed(2)}%` : '-'}</td>
