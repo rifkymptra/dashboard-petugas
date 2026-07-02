@@ -19,10 +19,10 @@ export default function Header() {
           </div>
           <div className="flex flex-col justify-center">
             <h1 className="font-bold text-slate-800 text-base md:text-lg leading-tight">
-              BPS Kabupaten Garut
+              BPS KABUPATEN GARUT
             </h1>
             <p className="text-[10px] md:text-xs text-slate-500 font-medium tracking-wider uppercase">
-              Dashboard Sensus 2026
+              Dashboard Petugas Sensus Ekonomi 2026
             </p>
           </div>
         </div>
@@ -32,9 +32,9 @@ export default function Header() {
           <div className="h-full flex items-center border-b-2 border-blue-600 text-blue-600 font-semibold text-sm">
             Progres Harian
           </div>
-          <div className="h-full flex items-center text-slate-400 font-medium text-sm cursor-not-allowed">
+          {/* <div className="h-full flex items-center text-slate-400 font-medium text-sm cursor-not-allowed">
             Riwayat (Segera)
-          </div>
+          </div> */}
         </nav>
       </div>
     </header>

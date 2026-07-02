@@ -1,8 +1,3 @@
 {
-  "crons": [
-    {
-      "path": "/api/update-h1?secret=rahasiaku123",
-      "schedule": "0 */1 * * *"
-    }
-  ]
+
 }
