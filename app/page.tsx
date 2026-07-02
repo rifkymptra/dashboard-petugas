@@ -4,11 +4,12 @@ import { kv } from '@vercel/kv';
 import masterDataRaw from './data/Master SLS.json'; 
 import FilterWilayah from './components/FilterWilayah';
 import TabelProgres, { DataTabel } from './components/TabelProgres';
+import Header from './components/Header'; // Impor Header Baru
 
 interface PetugasData {
   nama_petugas: string;
   kdkab: string;
-  target: number; // Mengambil target dari API
+  target: number;
   pendataan: number;
   submit: number;
   percentage: number; 
@@ -18,7 +19,7 @@ interface PetugasData {
 interface MasterSLS {
   nmkec: string;
   nmdesa: string;
-  nmsls: string;
+  "Nama PML": string;
   "Email PPL": string;
   [key: string]: any; 
 }
@@ -46,10 +47,12 @@ function getTargetHariIni() {
 export default async function DashboardPage({ 
   searchParams 
 }: { 
-  searchParams: Promise<{ kec?: string, desa?: string, sls?: string }> 
+  searchParams: Promise<{ kec?: string, desa?: string, pml?: string }> 
 }) {
   const keys = getLatestKeys();
   const historyData = await kv.mget(...keys);
+  const lastUpdateRaw = await kv.get('last_update_time') as string;
+  const lastUpdate = lastUpdateRaw ? lastUpdateRaw : "Belum tersedia";
 
   const dataHariIni = (historyData[0] as PetugasData[]) || [];
   const dataKemarin = (historyData[1] as PetugasData[]) || [];
@@ -58,15 +61,22 @@ export default async function DashboardPage({
   const params = await searchParams;
   const selectedKec = params.kec || '';
   const selectedDesa = params.desa || '';
-  const selectedSls = params.sls || '';
+  const selectedPml = params.pml || '';
 
   const filteredData = dataHariIni.filter((petugas) => {
-    if (!selectedKec && !selectedDesa && !selectedSls) return true;
+    if (!selectedKec && !selectedDesa && !selectedPml) return true;
+    
     return masterData.some((m) => {
       if (m["Email PPL"] !== petugas.kdkab) return false;
-      if (selectedKec && m.nmkec !== selectedKec) return false;
-      if (selectedDesa && m.nmdesa !== selectedDesa) return false;
-      if (selectedSls && m.nmsls !== selectedSls) return false;
+      
+      const cleanKec = m.nmkec ? String(m.nmkec).trim().toUpperCase() : '';
+      const cleanDesa = m.nmdesa ? String(m.nmdesa).trim().toUpperCase() : '';
+      const cleanPml = m["Nama PML"] ? String(m["Nama PML"]).trim().toUpperCase() : '';
+
+      if (selectedKec && cleanKec !== selectedKec) return false;
+      if (selectedDesa && cleanDesa !== selectedDesa) return false;
+      if (selectedPml && cleanPml !== selectedPml) return false;
+      
       return true;
     });
   });
@@ -86,15 +96,13 @@ export default async function DashboardPage({
     return {
       nama_petugas: petugas.nama_petugas,
       kdkab: petugas.kdkab, 
-      target: petugas.target || 0, // Target individu dari API
-
+      target: petugas.target || 0,
       pendataanLusa,
       pendataanKemarin,
       naikPendataanKemarin: pendataanKemarin - pendataanLusa,
       pendataanHariIni,
       naikPendataanHariIni: pendataanHariIni - pendataanKemarin,
       persentasePendataan: petugas.percentage_pendataan || 0,
-      
       submitLusa,
       submitKemarin,
       naikSubmitKemarin: submitKemarin - submitLusa,
@@ -107,10 +115,22 @@ export default async function DashboardPage({
   const targetHariIni = getTargetHariIni();
 
   return (
-    <main className="p-8 font-sans bg-gray-50 min-h-screen">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">Progres 3 Hari Terakhir</h1>
-      <FilterWilayah kec={selectedKec} desa={selectedDesa} sls={selectedSls} />
-      <TabelProgres data={mergedData} targetHariIni={targetHariIni} />
-    </main>
+    <div className="min-h-screen bg-slate-50 font-sans" suppressHydrationWarning>
+      <Header />
+    {/* Wrapper tengah dengan lebar maksimum */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Progres Pengumpulan Data</h2>
+            <p className="text-sm text-slate-500 mt-1">Pantau kinerja petugas lapangan selama 3 hari terakhir.</p>
+          </div>
+        </div>
+        
+        <FilterWilayah kec={selectedKec} desa={selectedDesa} pml={selectedPml} />
+        <TabelProgres data={mergedData} targetHariIni={targetHariIni} lastUpdate={lastUpdate} />
+        
+      </main>
+    </div>
   );
 }
