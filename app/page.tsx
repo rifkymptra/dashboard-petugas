@@ -175,7 +175,7 @@ export default async function DashboardPage({
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Progres Pengumpulan Data</h2>
+            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Progress Pengumpulan Data</h2>
             <p className="text-sm text-slate-500 mt-1">Pantau kinerja harian petugas lapangan dalam 5 hari terakhir.</p>
           </div>
         </div>
