@@ -14,6 +14,7 @@ interface PetugasData {
   submit: number;
   percentage: number; 
   percentage_pendataan: number;
+  draft: number;
 }
 
 interface MasterSLS {
@@ -104,7 +105,11 @@ export default async function DashboardPage({
     const h3 = Math.max(0, c3 - c4);
     const h4 = Math.max(0, c4 - c5);
 
+    const totalSubmit = petugas.submit || 0;
+    const totalDraft = petugas.draft || 0;
+
     const target = petugas.target || 0;
+    const reject = Math.max(0, c0 - totalSubmit - totalDraft);
 
     // Cari info PML dari master data
     const masterInfo = masterData.find(m => m["Email PPL"] === petugas.kdkab);
@@ -124,7 +129,8 @@ export default async function DashboardPage({
       pct0: target > 0 ? (h0 / target) * 100 : 0,
       pctTotal: petugas.percentage_pendataan || 0,
       nama_pml,
-      email_pml
+      email_pml,
+      reject
     };
   });
 
@@ -137,7 +143,7 @@ export default async function DashboardPage({
         nama_petugas: key, // Di tabel PML, kolom nama akan berisi Nama PML
         kdkab: ppl.email_pml && ppl.email_pml !== "-" ? ppl.email_pml : "Pengawas (PML)",
         target: 0, h4: 0, h3: 0, h2: 0, h1: 0, h0: 0, totalPendataan: 0,
-        pct4: 0, pct3: 0, pct2: 0, pct1: 0, pct0: 0, pctTotal: 0,
+        pct4: 0, pct3: 0, pct2: 0, pct1: 0, pct0: 0, pctTotal: 0, reject:0
       });
     }
     const pml = pmlMap.get(key)!;
