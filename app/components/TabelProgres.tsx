@@ -24,17 +24,16 @@ export interface DataTabel {
 }
 
 interface Props {
-  dataPPL: DataTabel[]; // Menerima data PPL
-  dataPML: DataTabel[]; // Menerima data PML
+  dataPPL: DataTabel[];
+  dataPML: DataTabel[];
   targetHariIni: number;
   lastUpdate: string;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
-type ViewMode = 'PPL' | 'PML'; // Tipe untuk sakelar
+type ViewMode = 'PPL' | 'PML'; 
 
 export default function TabelProgres({ dataPPL, dataPML, targetHariIni, lastUpdate }: Props) {
-  // State baru untuk mengatur tampilan tabel aktif
   const [viewMode, setViewMode] = useState<ViewMode>('PPL');
   
   const [sortConfig, setSortConfig] = useState<{ key: keyof DataTabel | null; direction: SortDirection }>({
@@ -44,7 +43,9 @@ export default function TabelProgres({ dataPPL, dataPML, targetHariIni, lastUpda
   
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Menentukan sumber data yang aktif
+  const [filterTarget, setFilterTarget] = useState({ green: true, yellow: true, red: true });
+  const [filterVol, setFilterVol] = useState({ blue: true, yellow: true, red: true });
+
   const activeData = viewMode === 'PPL' ? dataPPL : dataPML;
 
   const handleSort = (key: keyof DataTabel) => {
@@ -56,7 +57,7 @@ export default function TabelProgres({ dataPPL, dataPML, targetHariIni, lastUpda
     setSortConfig({ key: direction ? key : null, direction });
   };
 
-const processedData = useMemo(() => {
+  const processedData = useMemo(() => {
     let result = activeData;
     
     if (searchQuery) {
@@ -67,12 +68,30 @@ const processedData = useMemo(() => {
       );
     }
 
+    result = result.filter(item => {
+      let passTarget = false;
+      if (targetHariIni > 0) {
+        const rasio = item.pctTotal / targetHariIni;
+        if (rasio >= 1 && filterTarget.green) passTarget = true;
+        else if (rasio >= 0.8 && rasio < 1 && filterTarget.yellow) passTarget = true;
+        else if (rasio < 0.8 && filterTarget.red) passTarget = true;
+      } else {
+        passTarget = true; 
+      }
+
+      let passVol = false;
+      const h0 = item.h0 || 0;
+      if (h0 >= 10 && filterVol.blue) passVol = true;
+      else if (h0 >= 7 && h0 <= 9 && filterVol.yellow) passVol = true;
+      else if (h0 < 7 && filterVol.red) passVol = true;
+
+      return passTarget && passVol;
+    });
+
     if (sortConfig.direction && sortConfig.key) {
       result = [...result].sort((a, b) => {
-        // PERBAIKAN: Beri nilai fallback '' jika undefined, dan gunakan 'as any'
         const aValue = a[sortConfig.key as keyof DataTabel] ?? '';
         const bValue = b[sortConfig.key as keyof DataTabel] ?? '';
-        
         if ((aValue as any) < (bValue as any)) return sortConfig.direction === 'asc' ? -1 : 1;
         if ((aValue as any) > (bValue as any)) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
@@ -80,9 +99,8 @@ const processedData = useMemo(() => {
     }
 
     return result;
-  }, [activeData, searchQuery, sortConfig]);
+  }, [activeData, searchQuery, sortConfig, filterTarget, filterVol, targetHariIni]);
 
-  // Capaian wilayah tetap dihitung dari PPL agar selaras (meskipun dari PML hasilnya sama)
   const totalCapaian = dataPPL.reduce((sum, item) => sum + (item.totalPendataan || 0), 0);
   const totalTarget = dataPPL.reduce((sum, item) => sum + (item.target || 0), 0);
   const capaianWilayah = totalTarget > 0 ? (totalCapaian / totalTarget) * 100 : 0;
@@ -167,9 +185,62 @@ const processedData = useMemo(() => {
         </div>
       </div>
 
-      {/* Baris Kontrol */}
-      <div className="mb-4 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4">
-        <div className="flex flex-col gap-3">
+      {/* Baris Kontrol: Kiri (Filter) & Kanan (Last Update + Search/Switch) */}
+      <div className="mb-4 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-5">
+        
+        {/* === SISI KIRI: FILTER KOTAK SAJA === */}
+        <div className="flex flex-col gap-2.5 bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm w-full lg:w-fit">
+          {/* Filter Target */}
+          <div className="flex flex-wrap items-center gap-4 border-b border-slate-100 pb-2.5">
+            <span className="font-bold text-slate-700 text-xs uppercase tracking-wider w-36">Filter Target:</span>
+            
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium hover:bg-slate-50 py-1 px-2 rounded transition-colors select-none text-slate-700">
+              <input type="checkbox" checked={filterTarget.green} onChange={() => setFilterTarget(p => ({...p, green: !p.green}))} className="accent-emerald-500 w-3.5 h-3.5" />
+              <div className="w-3.5 h-3.5 rounded bg-emerald-50 border border-emerald-300"></div>
+              {/* FIX: Penambahan class text-emerald-700 agar sangat jelas terlihat */}
+              <span className="font-bold text-emerald-700">≥ Target</span>
+            </label>
+            
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium hover:bg-slate-50 py-1 px-2 rounded transition-colors select-none text-slate-700">
+              <input type="checkbox" checked={filterTarget.yellow} onChange={() => setFilterTarget(p => ({...p, yellow: !p.yellow}))} className="accent-amber-500 w-3.5 h-3.5" />
+              <div className="w-3.5 h-3.5 rounded bg-amber-50 border border-amber-300"></div>
+              {/* FIX: Penambahan class text-amber-600 */}
+              <span className="font-bold text-amber-600">80-99%</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium hover:bg-slate-50 py-1 px-2 rounded transition-colors select-none text-slate-700">
+              <input type="checkbox" checked={filterTarget.red} onChange={() => setFilterTarget(p => ({...p, red: !p.red}))} className="accent-rose-500 w-3.5 h-3.5" />
+              <div className="w-3.5 h-3.5 rounded bg-rose-50 border border-rose-300"></div>
+              {/* FIX: Penambahan class text-rose-600 */}
+              <span className="font-bold text-rose-600">&lt; 80%</span>
+            </label>
+          </div>
+
+          {/* Filter Volume */}
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="font-bold text-slate-700 text-xs uppercase tracking-wider w-36">Filter Vol Hari Ini:</span>
+            
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium hover:bg-slate-50 py-1 px-2 rounded transition-colors select-none text-slate-700">
+              <input type="checkbox" checked={filterVol.blue} onChange={() => setFilterVol(p => ({...p, blue: !p.blue}))} className="accent-blue-600 w-3.5 h-3.5" />
+              <span className="text-blue-700 font-extrabold w-12 text-center">≥ 10</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium hover:bg-slate-50 py-1 px-2 rounded transition-colors select-none text-slate-700">
+              <input type="checkbox" checked={filterVol.yellow} onChange={() => setFilterVol(p => ({...p, yellow: !p.yellow}))} className="accent-amber-500 w-3.5 h-3.5" />
+              <span className="text-amber-600 font-extrabold w-12 text-center">7 - 9</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium hover:bg-slate-50 py-1 px-2 rounded transition-colors select-none text-slate-700">
+              <input type="checkbox" checked={filterVol.red} onChange={() => setFilterVol(p => ({...p, red: !p.red}))} className="accent-red-500 w-3.5 h-3.5" />
+              <span className="text-red-600 font-extrabold w-12 text-center">&lt; 7</span>
+            </label>
+          </div>
+        </div>
+
+        {/* === SISI KANAN: TERAKHIR DIPERBARUI (ATAS) & KONTROL (BAWAH) === */}
+        <div className="flex flex-col items-start lg:items-end gap-3 w-full lg:w-auto">
+          
+          {/* Terakhir Diperbarui dipindah ke sini */}
           <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-100/70 border border-slate-200 px-3 py-1.5 rounded-lg w-fit">
             <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -177,58 +248,45 @@ const processedData = useMemo(() => {
             <span>Terakhir Diperbarui: <strong className="text-slate-700">{lastUpdate}</strong></span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-5 text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-200 shadow-sm w-fit">
-            <div className="flex items-center gap-4 border-r border-slate-200 pr-4">
-              <span className="font-bold text-slate-700">Warna Baris (Target):</span>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-50 border border-emerald-200"></div><span>≥ Target</span></div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-50 border border-amber-200"></div><span>80-99%</span></div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-rose-50 border border-rose-200"></div><span>&lt; 80%</span></div>
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+            {/* Sakelar PPL / PML */}
+            <div className="flex bg-slate-100 p-1 rounded-lg w-full sm:w-fit border border-slate-200 shadow-inner">
+              <button
+                onClick={() => setViewMode('PPL')}
+                className={`flex-1 sm:flex-none px-4 py-1.5 text-sm font-bold rounded-md transition-all ${viewMode === 'PPL' ? 'bg-white text-blue-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Level PPL
+              </button>
+              <button
+                onClick={() => setViewMode('PML')}
+                className={`flex-1 sm:flex-none px-4 py-1.5 text-sm font-bold rounded-md transition-all ${viewMode === 'PML' ? 'bg-white text-emerald-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Level PML
+              </button>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="font-bold text-slate-700">Warna Volume:</span>
-              <span className="text-blue-700 font-extrabold">≥ 10</span>
-              <span className="text-amber-600 font-extrabold">7-9</span>
-              <span className="text-red-600 font-extrabold">&lt; 7</span>
-            </div>
+
+            {/* Pencarian */}
+            <input 
+              type="text" 
+              placeholder="Cari nama..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full sm:flex-1 lg:w-56 p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+            />
+            
+            {/* Export */}
+            <button 
+              onClick={exportToExcel}
+              className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export
+            </button>
           </div>
         </div>
 
-        {/* Grup Kanan: SAKELAR (TOGGLE), Pencarian, Export */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-          
-          {/* SWITCH BUTTONS BARU */}
-          <div className="flex bg-slate-100 p-1 rounded-lg w-full sm:w-fit border border-slate-200 shadow-inner">
-            <button
-              onClick={() => setViewMode('PPL')}
-              className={`flex-1 sm:flex-none px-4 py-1.5 text-sm font-bold rounded-md transition-all ${viewMode === 'PPL' ? 'bg-white text-blue-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Level PPL
-            </button>
-            <button
-              onClick={() => setViewMode('PML')}
-              className={`flex-1 sm:flex-none px-4 py-1.5 text-sm font-bold rounded-md transition-all ${viewMode === 'PML' ? 'bg-white text-emerald-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Level PML
-            </button>
-          </div>
-
-          <input 
-            type="text" 
-            placeholder="Cari nama..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full sm:flex-1 lg:w-56 p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
-          />
-          <button 
-            onClick={exportToExcel}
-            className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap flex items-center justify-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export
-          </button>
-        </div>
       </div>
 
       {/* Tabel */}
@@ -238,14 +296,13 @@ const processedData = useMemo(() => {
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[10px] uppercase font-bold tracking-wider cursor-pointer select-none">
               <tr>
                 <th rowSpan={2} onClick={() => handleSort('nama_petugas')} className="py-4 px-4 text-left hover:bg-slate-100 transition-colors align-middle min-w-[220px] sticky left-0 z-10 bg-slate-50 border-r border-slate-200">
-                  {/* HEADER NAMA DINAMIS: Berubah sesuai mode yang dipilih */}
                   {viewMode === 'PPL' ? 'Petugas (PPL) & Email' : 'Pengawas (PML)'}
                   {renderSortIndicator('nama_petugas')}
                 </th>
                 <th rowSpan={2} onClick={() => handleSort('target')} className="py-4 px-2 hover:bg-slate-100 transition-colors align-middle border-r border-slate-200">
                   Target{renderSortIndicator('target')}
                 </th>
-                <th colSpan={6} className="py-2 border-r border-slate-200 bg-blue-50/50 text-blue-800">Pendataan Harian</th>
+                <th colSpan={6} className="py-2 border-r border-slate-200 bg-blue-50/50 text-blue-800">Tambahan Harian (Volume)</th>
                 <th colSpan={6} className="py-2 bg-emerald-50/50 text-emerald-800">Persentase Harian (%)</th>
               </tr>
               <tr className="border-t border-slate-200">
@@ -268,7 +325,7 @@ const processedData = useMemo(() => {
             <tbody className="text-slate-700 text-[13px]">
               {processedData.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="py-12 text-center text-slate-500 bg-white">Tidak ada data ditemukan.</td>
+                  <td colSpan={14} className="py-12 text-center text-slate-500 bg-white">Tidak ada data yang sesuai dengan filter.</td>
                 </tr>
               ) : (
                 processedData.map((petugas) => {
