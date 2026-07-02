@@ -17,14 +17,6 @@ interface PetugasData {
   draft: number;
 }
 
-interface MasterSLS {
-  nmkec: string;
-  nmdesa: string;
-  "Nama PML": string;
-  "Email PML"?: string; // Asumsi ada email PML, jika tidak ada aman
-  "Email PPL": string;
-  [key: string]: any; 
-}
 
 const masterData = masterDataRaw as MasterSLS[];
 
