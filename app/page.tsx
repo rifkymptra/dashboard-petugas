@@ -57,7 +57,9 @@ export default async function DashboardPage({
   searchParams: Promise<{ kec?: string, desa?: string, pml?: string }> 
 }) {
   const keys = getLatestKeys();
+  console.log("🔍 DETEKTIF: Key yang dicari web ->", keys);
   const historyData = await kv.mget(...keys);
+  console.log("🔍 DETEKTIF: Isi Data Hari Ini (d0) ->", historyData[0] ? "ADA DATA" : "KOSONG/NULL");
   
   const lastUpdateRaw = await kv.get('last_update_time') as string;
   const lastUpdate = lastUpdateRaw ? lastUpdateRaw : "Belum tersedia";

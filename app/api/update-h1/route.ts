@@ -25,9 +25,7 @@ export async function GET(request: Request) {
     const lastUpdate = jsonData.last_update;
 
     // --- LOGIKA: Simpan dengan key tanggal hari ini ---
-    const now = new Date();
-  const shiftTime = new Date(now.getTime() - (6 * 60 * 60 * 1000)); 
-  const today = shiftTime.toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
     const key = `data_${today}`;
     
     await kv.set(key, JSON.stringify(liveData));
