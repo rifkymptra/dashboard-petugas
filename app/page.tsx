@@ -57,9 +57,7 @@ export default async function DashboardPage({
   searchParams: Promise<{ kec?: string, desa?: string, pml?: string }> 
 }) {
   const keys = getLatestKeys();
-  console.log("🔍 DETEKTIF: Key yang dicari web ->", keys);
   const historyData = await kv.mget(...keys);
-  console.log("🔍 DETEKTIF: Isi Data Hari Ini (d0) ->", historyData[0] ? "ADA DATA" : "KOSONG/NULL");
   
   const lastUpdateRaw = await kv.get('last_update_time') as string;
   const lastUpdate = lastUpdateRaw ? lastUpdateRaw : "Belum tersedia";
@@ -77,36 +75,61 @@ export default async function DashboardPage({
   const selectedPml = params.pml || '';
 
   // 1. TAHAP JOIN: Gabungkan & Perkaya Data Dulu Tanpa Filter
-  const enrichedData = d0.map((petugas) => {
-    const p1 = d1.find(p => p.kdkab === petugas.kdkab);
-    const p2 = d2.find(p => p.kdkab === petugas.kdkab);
-    const p3 = d3.find(p => p.kdkab === petugas.kdkab);
-    const p4 = d4.find(p => p.kdkab === petugas.kdkab);
-    const p5 = d5.find(p => p.kdkab === petugas.kdkab);
+  // Kumpulkan semua email dari H-0 sampai H-5 agar tidak ada satupun petugas yang terlewat
+  const allKdkab = Array.from(new Set([
+    ...d0.map(p => p.kdkab),
+    ...d1.map(p => p.kdkab),
+    ...d2.map(p => p.kdkab),
+    ...d3.map(p => p.kdkab),
+    ...d4.map(p => p.kdkab),
+    ...d5.map(p => p.kdkab)
+  ]));
 
-    const c0 = petugas.pendataan || 0;
+  const enrichedData = allKdkab.map((email) => {
+    // Cari data di masing-masing hari menggunakan email
+    const p0 = d0.find(p => p.kdkab === email);
+    const p1 = d1.find(p => p.kdkab === email);
+    const p2 = d2.find(p => p.kdkab === email);
+    const p3 = d3.find(p => p.kdkab === email);
+    const p4 = d4.find(p => p.kdkab === email);
+    const p5 = d5.find(p => p.kdkab === email);
+
+    // Ambil data dasar dari hari terbaru yang tersedia untuk petugas ini
+    // Kalau dia tidak ada di d0, sistem akan cek d1, kalau d1 kosong cek d2, dst.
+    const baseData = p0 || p1 || p2 || p3 || p4 || p5 || { nama_petugas: "", target: 0, submit: 0, draft: 0, pendataan: 0 };
+
+    // --- KUNCI SOLUSINYA ---
+    // Biarkan c1 sampai c5 persis seperti aslinya agar H-4 dan H-3 tidak rusak
     const c1 = p1?.pendataan || 0;
     const c2 = p2?.pendataan || 0;
     const c3 = p3?.pendataan || 0;
     const c4 = p4?.pendataan || 0;
     const c5 = p5?.pendataan || 0;
 
-    const h0 = Math.max(0, c0 - c1);
+    // Untuk c0 (Total Pendataan): Jika p0 bolong dari API, kita pakai nilai pendataan TERAKHIR mereka (baseData) 
+    // agar total di dasbor tidak tiba-tiba berubah jadi 0.
+    const c0 = p0?.pendataan !== undefined ? p0.pendataan : baseData.pendataan; 
+    
+    // Perhitungan Harian
+    // Jika orang ini bolong di API hari ini, kita PAKSA nilai "Hari Ini" jadi 0.
+    const h0 = p0?.pendataan !== undefined ? Math.max(0, c0 - c1) : 0;
+    
+    // H-1 sampai H-4 berjalan normal sesuai rumus Anda
     const h1 = Math.max(0, c1 - c2);
     const h2 = Math.max(0, c2 - c3);
     const h3 = Math.max(0, c3 - c4);
     const h4 = Math.max(0, c4 - c5);
 
-    const totalSubmit = petugas.submit || 0;
-    const totalDraft = petugas.draft || 0;
-    const target = petugas.target || 0;
+    const totalSubmit = baseData.submit || 0;
+    const totalDraft = baseData.draft || 0;
+    const target = baseData.target || 0;
     const reject = Math.max(0, c0 - totalSubmit - totalDraft);
 
     // Cari info di Master SLS (Kebal Huruf Besar/Kecil & Spasi)
     const masterInfo = masterData.find(m => 
       m["Email PPL"] && 
-      petugas.kdkab && 
-      String(m["Email PPL"]).trim().toLowerCase() === String(petugas.kdkab).trim().toLowerCase()
+      email && 
+      String(m["Email PPL"]).trim().toLowerCase() === String(email).trim().toLowerCase()
     );
 
     // Ambil Atribut Wilayah untuk keperluan filter nanti
@@ -117,12 +140,12 @@ export default async function DashboardPage({
 
     // LOGIKA PRIORITAS NAMA PPL (Master -> API -> Default)
     const namaPPLMaster = masterInfo?.["Nama PPL"] ? String(masterInfo["Nama PPL"]).trim() : null;
-    const namaAPI = petugas.nama_petugas ? String(petugas.nama_petugas).trim() : null;
+    const namaAPI = baseData.nama_petugas ? String(baseData.nama_petugas).trim() : null;
     const finalNamaPPL = namaPPLMaster || namaAPI || "TANPA NAMA (CEK MASTER)";
 
     return {
       nama_petugas: finalNamaPPL,
-      kdkab: petugas.kdkab, 
+      kdkab: email, 
       target,
       h4, h3, h2, h1, h0,
       totalPendataan: c0,
@@ -131,11 +154,10 @@ export default async function DashboardPage({
       pct2: target > 0 ? (h2 / target) * 100 : 0,
       pct1: target > 0 ? (h1 / target) * 100 : 0,
       pct0: target > 0 ? (h0 / target) * 100 : 0,
-      pctTotal: petugas.percentage_pendataan || 0,
+      pctTotal: target > 0 ? (c0 / target) * 100 : 0, 
       nama_pml,
       email_pml,
       reject,
-      // Field rahasia untuk mempermudah filter
       _kec: nmkec,
       _desa: nmdesa
     };
