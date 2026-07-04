@@ -22,11 +22,8 @@ export async function GET(request: Request) {
     const liveData = jsonData.data || []; 
     const lastUpdate = jsonData.last_update;
 
-    // --- PENYESUAIAN WAKTU (SHIFT 6 JAM) ---
-    // Agar sinkron dengan logika dasbor (pindah hari pada jam 06:00 WIB)
-    const d = new Date();
-    d.setHours(d.getHours() - 6);
-    const today = d.toISOString().split('T')[0];
+    // --- LOGIKA: Simpan dengan key tanggal hari ini ---
+    const today = new Date().toISOString().split('T')[0];
     const key = `data_${today}`;
 
     // === LOGIKA MERGE & MAX (PELINDUNG DATA) ===
