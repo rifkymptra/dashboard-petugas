@@ -98,23 +98,24 @@ export default async function DashboardPage({
     // Kalau dia tidak ada di d0, sistem akan cek d1, kalau d1 kosong cek d2, dst.
     const baseData = p0 || p1 || p2 || p3 || p4 || p5 || { nama_petugas: "", target: 0, submit: 0, draft: 0, pendataan: 0 };
 
-    // --- KUNCI SOLUSINYA ---
-    // Biarkan c1 sampai c5 persis seperti aslinya agar H-4 dan H-3 tidak rusak
-    const c1 = p1?.pendataan || 0;
-    const c2 = p2?.pendataan || 0;
-    const c3 = p3?.pendataan || 0;
-    const c4 = p4?.pendataan || 0;
+    // --- KUNCI SOLUSINYA DI SINI ---
+    // Logika Cascading Fallback: Jika data suatu hari hilang (karena API error), 
+    // totalnya (c) akan mengambil total dari hari sebelumnya.
+    
     const c5 = p5?.pendataan || 0;
+    const c4 = p4?.pendataan !== undefined ? p4.pendataan : c5; 
+    const c3 = p3?.pendataan !== undefined ? p3.pendataan : c4;
+    const c2 = p2?.pendataan !== undefined ? p2.pendataan : c3;
+    
+    // Jika d1 (kemarin) error/kosong, c1 akan meminjam nilai c2 (H-2)
+    const c1 = p1?.pendataan !== undefined ? p1.pendataan : c2;
+    
+    // Jika d0 (hari ini) error/kosong, c0 akan meminjam nilai c1
+    const c0 = p0?.pendataan !== undefined ? p0.pendataan : c1; 
 
-    // Untuk c0 (Total Pendataan): Jika p0 bolong dari API, kita pakai nilai pendataan TERAKHIR mereka (baseData) 
-    // agar total di dasbor tidak tiba-tiba berubah jadi 0.
-    const c0 = p0?.pendataan !== undefined ? p0.pendataan : baseData.pendataan; 
-    
     // Perhitungan Harian
-    // Jika orang ini bolong di API hari ini, kita PAKSA nilai "Hari Ini" jadi 0.
-    const h0 = p0?.pendataan !== undefined ? Math.max(0, c0 - c1) : 0;
-    
-    // H-1 sampai H-4 berjalan normal sesuai rumus Anda
+    // Jika c1 meminjam c2, maka h1 = c1 - c2 otomatis menjadi 0 (strip)
+    const h0 = Math.max(0, c0 - c1);
     const h1 = Math.max(0, c1 - c2);
     const h2 = Math.max(0, c2 - c3);
     const h3 = Math.max(0, c3 - c4);
