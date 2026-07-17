@@ -94,8 +94,32 @@ export async function GET(request: Request) {
       daftar_anomali: extractAnomalies(item, 'U', 'T_MIKRO_ANOMALI_USAHA_', 8)
     }));
 
-    const combinedData = [...normalizedKeluarga, ...normalizedUsaha];
-    const finalData = combinedData.filter(item => item.daftar_anomali.length > 0);
+    // === SOLUSI PENGGABUNGAN (MERGING) BERDASARKAN ASSIGNMENT_ID ===
+    const mapGabungan = new Map();
+
+    // 1. Masukkan data Keluarga ke dalam Map
+    normalizedKeluarga.forEach((item: any) => {
+      if (item.daftar_anomali.length > 0) {
+        mapGabungan.set(item.assignment_id, item);
+      }
+    });
+
+    // 2. Masukkan data Usaha, GABUNGKAN jika ID sudah ada
+    normalizedUsaha.forEach((item: any) => {
+      if (item.daftar_anomali.length > 0) {
+        if (mapGabungan.has(item.assignment_id)) {
+          // JIKA SUDAH ADA: Gabungkan bola-bola anomalinya ke dalam satu baris
+          const existing = mapGabungan.get(item.assignment_id);
+          existing.daftar_anomali = [...existing.daftar_anomali, ...item.daftar_anomali];
+        } else {
+          // JIKA BELUM ADA: Masukkan sebagai baris baru
+          mapGabungan.set(item.assignment_id, item);
+        }
+      }
+    });
+
+    // 3. Ubah kembali Map menjadi Array hasil akhir
+    const finalData = Array.from(mapGabungan.values());
 
     // === SOLUSI: MENCACAH DATA (CHUNKING) ===
     const CHUNK_SIZE = 1500; // Simpan maksimal 1500 baris per kardus agar tidak kena limit 1MB
