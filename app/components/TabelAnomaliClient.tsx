@@ -28,6 +28,7 @@ export default function TabelAnomaliClient({ kec, desa, pml, ppl }: { kec: strin
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
   
   // State untuk Accordion & Filter Kategori
   const [isLegendOpen, setIsLegendOpen] = useState(false);
@@ -72,6 +73,56 @@ export default function TabelAnomaliClient({ kec, desa, pml, ppl }: { kec: strin
   const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
   const paginatedData = filteredData.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
+  // --- FUNGSI EKSPOR EXCEL ---
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      // Import xlsx secara dinamis agar tidak membebani loading awal halaman
+      const XLSX = await import('xlsx');
+      
+      // Format ulang data agar rapi di Excel
+      const excelData = filteredData.map((item, index) => {
+        // Memecah string wilayah: "3205 - KAB. GARUT | 190 - GARUT KOTA | 003 - CIMUNCANG | 007500 - RT 001 RW 020"
+        const wilayahParts = item.wilayah.split(' | ');
+        const kabupaten = wilayahParts[0] ? wilayahParts[0].trim() : '-';
+        const kecamatan = wilayahParts[1] ? wilayahParts[1].trim() : '-';
+        const desa = wilayahParts[2] ? wilayahParts[2].trim() : '-';
+        const sls = wilayahParts[3] ? wilayahParts[3].trim() : '-';
+
+        // Menggabungkan array anomali menjadi string (misal: "K1, K5")
+        const listAnomali = item.daftar_anomali.map((a: any) => a.kode).join(', ');
+
+        return {
+          "No": index + 1,
+          "Kabupaten": kabupaten,
+          "Kecamatan": kecamatan,
+          "Desa": desa,
+          "SLS": sls,
+          "Nama Usaha / KRT": item.nama_entitas,
+          "Petugas (PPL)": item.nama_petugas,
+          "Pengawas (PML)": item.nama_pml,
+          "Daftar Anomali": listAnomali,
+          "Update Terakhir": item.tanggal_update,
+          "Link Fasih": item.link_fasih && item.link_fasih !== '#' ? item.link_fasih : 'Tidak Ada Link'
+        };
+      });
+
+      // Membuat worksheet dan workbook
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Data Anomali");
+
+      // Mengunduh file Excel
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `Ekspor_Anomali_${dateStr}.xlsx`);
+    } catch (error) {
+      console.error("Gagal mengekspor data:", error);
+      alert("Terjadi kesalahan saat mengekspor Excel.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="bg-white p-12 rounded-xl shadow-sm border mt-6 flex flex-col items-center justify-center space-y-4">
@@ -103,7 +154,6 @@ export default function TabelAnomaliClient({ kec, desa, pml, ppl }: { kec: strin
 
         {isLegendOpen && (
           <div className="p-5 border-t bg-white space-y-6">
-            {/* Tabel Usaha */}
             <div>
               <h4 className="font-bold text-amber-700 mb-3 text-sm flex items-center">
                 <span className="bg-amber-500 w-3 h-3 rounded-full mr-2"></span> Anomali Usaha (U)
@@ -130,7 +180,6 @@ export default function TabelAnomaliClient({ kec, desa, pml, ppl }: { kec: strin
               </div>
             </div>
 
-            {/* Tabel Keluarga */}
             <div>
               <h4 className="font-bold text-blue-700 mb-3 text-sm flex items-center">
                 <span className="bg-blue-500 w-3 h-3 rounded-full mr-2"></span> Anomali Keluarga (K)
@@ -165,11 +214,35 @@ export default function TabelAnomaliClient({ kec, desa, pml, ppl }: { kec: strin
         
         {/* Header Tabel & Kontrol Filter */}
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
+          
+          <div className="flex items-center flex-wrap gap-3">
             <h3 className="text-lg font-bold text-slate-800">Daftar Anomali Data</h3>
             <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">
               {filteredData.length.toLocaleString('id-ID')} Baris Data
             </span>
+            
+            {/* TOMBOL EKSPOR EXCEL */}
+            <button
+              onClick={handleExportExcel}
+              disabled={isExporting || filteredData.length === 0}
+              className={`flex items-center px-3 py-1.5 font-bold text-xs rounded-md transition-colors border shadow-sm ${
+                isExporting || filteredData.length === 0 
+                  ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed' 
+                  : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 border-emerald-200'
+              }`}
+            >
+              {isExporting ? (
+                <svg className="animate-spin w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              )}
+              {isExporting ? 'Mengekspor...' : 'Ekspor Excel'}
+            </button>
           </div>
 
           {/* Filter Segmented Control */}
@@ -226,24 +299,27 @@ export default function TabelAnomaliClient({ kec, desa, pml, ppl }: { kec: strin
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex flex-wrap gap-1.5 justify-center">
-  {row.daftar_anomali.map((anomali: any, i: number) => {
-    const colorClass = anomali.tipe === 'K' ? 'bg-blue-500' : 'bg-amber-500';
-    const kamus = anomali.tipe === 'K' ? KAMUS_KELUARGA : KAMUS_USAHA;
-    const detail = kamus.find(k => k.kode === anomali.kode);
-    const penjelasanLengkap = detail ? detail.desc : 'Keterangan tidak tersedia';
+                          {row.daftar_anomali.map((anomali: any, i: number) => {
+                            const colorClass = anomali.tipe === 'K' 
+                                ? 'bg-blue-500 hover:bg-blue-600' 
+                                : 'bg-amber-500 hover:bg-amber-600';
+                            
+                            const kamus = anomali.tipe === 'K' ? KAMUS_KELUARGA : KAMUS_USAHA;
+                            const detail = kamus.find(k => k.kode === anomali.kode);
+                            const penjelasanLengkap = detail ? detail.desc : 'Keterangan tidak tersedia';
 
-    return (
-      <span 
-        key={i} 
-        title={penjelasanLengkap} // Browser mobile akan menampilkan ini saat ditekan lama (long-press)
-        className={`px-2 py-1 text-[11px] font-bold text-white rounded shadow-sm cursor-pointer transition-colors ${colorClass}`}
-        onClick={() => alert(penjelasanLengkap)} // <--- TAMBAHKAN INI agar pengguna HP bisa melihat info dengan sekali klik
-      >
-        {anomali.kode}
-      </span>
-    );
-  })}
-</div>
+                            return (
+                              <span 
+                                key={i} 
+                                title={penjelasanLengkap} 
+                                className={`px-2 py-1 text-[11px] font-bold text-white rounded shadow-sm cursor-pointer transition-colors ${colorClass}`}
+                                onClick={() => alert(penjelasanLengkap)}
+                              >
+                                {anomali.kode}
+                              </span>
+                            );
+                          })}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400 text-right whitespace-nowrap">{row.tanggal_update}</td>
                       <td className="px-4 py-3 text-center whitespace-nowrap">
