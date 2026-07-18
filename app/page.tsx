@@ -90,7 +90,7 @@ export default async function DashboardPage({
   // ==============================================
   if (activeTab === 'pendataan') {
     const keys = getLatestKeys();
-    const historyData = await kv.mget(...keys);
+    const historyData = await Promise.all(keys.map(key => kv.get(key)));
 
     const d0 = (historyData[0] as PetugasData[]) || [];
     const d1 = (historyData[1] as PetugasData[]) || [];
