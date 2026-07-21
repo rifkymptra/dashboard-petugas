@@ -10,6 +10,8 @@ import Header from './components/Header';
 import TabelAnomaliClient from './components/TabelAnomaliClient';
 import TabSwitcher from './components/TabSwitcher';
 
+export const revalidate = 21600;
+
 interface PetugasData {
   nama_petugas: string;
   kdkab: string;

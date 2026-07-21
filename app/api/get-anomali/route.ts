@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 import masterDataRaw from '../../data/Master SLS.json'; // Sesuaikan path ini jika error
 
+export const revalidate = 21600;
+
 export async function GET() {
   try {
     const meta = await kv.get('anomali_meta') as any;

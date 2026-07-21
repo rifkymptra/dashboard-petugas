@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 
+export const revalidate = 21600;
+
 // Fungsi pintar untuk mencicil tarikan data agar server BPS tidak pingsan
 async function fetchAllData(baseUrlString: string) {
   let allData: any[] = [];
