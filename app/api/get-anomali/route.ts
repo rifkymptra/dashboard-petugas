@@ -39,7 +39,9 @@ export async function GET() {
     // Berikan Cache 30 Menit ke Browser agar Tab Switch super instan!
     return NextResponse.json(
       { success: true, data: enrichedAnomali },
-      { headers: { 'Cache-Control': 'public, max-age=1800' } }
+      { headers: { 
+          'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=59' 
+        } }
     );
   } catch (error) {
     console.error("Gagal API:", error);

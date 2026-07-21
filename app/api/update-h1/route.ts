@@ -2,8 +2,6 @@
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 
-export const revalidate = 21600;
-
 export async function GET(request: Request) {
   // Keamanan sederhana agar tidak sembarang orang bisa menyimpan data
   const { searchParams } = new URL(request.url);
