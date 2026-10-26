@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import TabelProgres, { DataTabel } from './TabelProgres';
+import TabelProgres from './TabelProgres';
 
 interface TabelProgresClientProps {
   kec: string;
@@ -17,7 +17,6 @@ export default function TabelProgresClient({ kec, desa, pml, ppl }: TabelProgres
   const [lastUpdate, setLastUpdate] = useState<string>("Sedang memuat...");
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Ambil data dari API Client-Side
   useEffect(() => {
     fetch('/api/get-pendataan')
       .then(res => res.json())
@@ -35,9 +34,7 @@ export default function TabelProgresClient({ kec, desa, pml, ppl }: TabelProgres
       });
   }, []);
 
-  // Filter dan olah data berdasarkan pilihan dropdown pengguna
   const { filteredPPL, dataPML } = useMemo(() => {
-    // 1. Filter PPL
     const filtered = dataPPLRaw.filter(item => {
       if (kec && item._kec.toLowerCase() !== kec.toLowerCase()) return false;
       if (desa && item._desa.toLowerCase() !== desa.toLowerCase()) return false;
@@ -46,8 +43,8 @@ export default function TabelProgresClient({ kec, desa, pml, ppl }: TabelProgres
       return true;
     });
 
-    // 2. Agregasi Data PML
-    const pmlMap = new Map<string, DataTabel>();
+    // Menggunakan tipe any agar TS tidak protes tentang properti tambahan
+    const pmlMap = new Map<string, any>();
     filtered.forEach(item => {
       const key = item.nama_pml || "TIDAK DIKETAHUI";
       if (!pmlMap.has(key)) {
@@ -55,15 +52,21 @@ export default function TabelProgresClient({ kec, desa, pml, ppl }: TabelProgres
           nama_petugas: key, 
           kdkab: item.email_pml && item.email_pml !== "-" ? item.email_pml : "Pengawas (PML)",
           target: 0, h4: 0, h3: 0, h2: 0, h1: 0, h0: 0, totalPendataan: 0, 
-          pct4: 0, pct3: 0, pct2: 0, pct1: 0, pct0: 0, pctTotal: 0, reject: 0
+          pct4: 0, pct3: 0, pct2: 0, pct1: 0, pct0: 0, pctTotal: 0, reject: 0,
+          // WAJIB ADA: Mencegah tabel crash
+          submit: 0, draft: 0, pendataan: 0, percentage: 0, percentage_pendataan: 0
         });
       }
       const pmlObj = pmlMap.get(key)!;
       pmlObj.target += item.target; pmlObj.h4 += item.h4; pmlObj.h3 += item.h3; pmlObj.h2 += item.h2;
-      pmlObj.h1 += item.h1; pmlObj.h0 += item.h0; pmlObj.totalPendataan += item.totalPendataan; pmlObj.reject += item.reject; 
+      pmlObj.h1 += item.h1; pmlObj.h0 += item.h0; 
+      pmlObj.totalPendataan += item.totalPendataan; 
+      pmlObj.reject += item.reject;
+      pmlObj.submit += (item.submit || 0);
+      pmlObj.draft += (item.draft || 0);
+      pmlObj.pendataan += (item.pendataan || item.totalPendataan || 0);
     });
 
-    // Hitung persentase PML
     const aggregatedPML = Array.from(pmlMap.values()).map(pmlObj => {
       pmlObj.pct4 = pmlObj.target > 0 ? (pmlObj.h4 / pmlObj.target) * 100 : 0;
       pmlObj.pct3 = pmlObj.target > 0 ? (pmlObj.h3 / pmlObj.target) * 100 : 0;
@@ -71,6 +74,10 @@ export default function TabelProgresClient({ kec, desa, pml, ppl }: TabelProgres
       pmlObj.pct1 = pmlObj.target > 0 ? (pmlObj.h1 / pmlObj.target) * 100 : 0;
       pmlObj.pct0 = pmlObj.target > 0 ? (pmlObj.h0 / pmlObj.target) * 100 : 0;
       pmlObj.pctTotal = pmlObj.target > 0 ? (pmlObj.totalPendataan / pmlObj.target) * 100 : 0;
+      
+      // Kalkulasi untuk Tabel Asli
+      pmlObj.percentage = pmlObj.target > 0 ? (pmlObj.submit / pmlObj.target) * 100 : 0;
+      pmlObj.percentage_pendataan = pmlObj.target > 0 ? (pmlObj.pendataan / pmlObj.target) * 100 : 0;
       return pmlObj;
     });
 
@@ -86,7 +93,6 @@ export default function TabelProgresClient({ kec, desa, pml, ppl }: TabelProgres
     );
   }
 
-  // Gunakan komponen UI asli yang sudah Anda buat
   return (
     <TabelProgres 
       dataPPL={filteredPPL} 

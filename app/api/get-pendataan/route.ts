@@ -1,7 +1,7 @@
 // app/api/get-pendataan/route.ts
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
-import masterDataRaw from '../../data/Master SLS.json'; // Sesuaikan path jika letaknya berbeda
+import masterDataRaw from '../../data/Master SLS.json'; 
 
 interface PetugasData {
   nama_petugas: string;
@@ -10,6 +10,8 @@ interface PetugasData {
   pendataan: number;
   submit: number;
   draft: number;
+  percentage?: number;
+  percentage_pendataan?: number;
 }
 
 function getLatestKeys() {
@@ -33,10 +35,7 @@ function getTargetHariIni() {
 export async function GET() {
   try {
     const keys = getLatestKeys();
-    
-    // Tarik 6 hari data secara paralel agar bebas dari limit 10MB Upstash
     const historyData = await Promise.all(keys.map(key => kv.get(key)));
-    
     const lastUpdateRaw = (await kv.get('last_update_time')) as string;
     const lastUpdate = lastUpdateRaw || "Belum tersedia";
 
@@ -52,7 +51,6 @@ export async function GET() {
       ...d3.map(p => p.kdkab), ...d4.map(p => p.kdkab), ...d5.map(p => p.kdkab)
     ]));
 
-    // Optimasi Map Master Data
     const masterLookup = new Map<string, any>();
     (masterDataRaw as any[]).forEach(m => {
       if (m["Email PPL"]) {
@@ -95,13 +93,16 @@ export async function GET() {
       const nmdesa = masterInfo?.nmdesa ? String(masterInfo.nmdesa).trim().toUpperCase() : "";
       const nama_pml = masterInfo?.["Nama PML"] ? String(masterInfo["Nama PML"]).trim().toUpperCase() : "TIDAK DIKETAHUI";
       const email_pml = masterInfo?.["Email PML"] ? String(masterInfo["Email PML"]).trim() : "-";
-
-      const namaPPLMaster = masterInfo?.["Nama PPL"] ? String(masterInfo["Nama PPL"]).trim() : null;
-      const namaAPI = baseData.nama_petugas ? String(baseData.nama_petugas).trim() : null;
-      const finalNamaPPL = namaPPLMaster || namaAPI || "TANPA NAMA (CEK MASTER)";
+      const finalNamaPPL = masterInfo?.["Nama PPL"] ? String(masterInfo["Nama PPL"]).trim() : (baseData.nama_petugas ? String(baseData.nama_petugas).trim() : "TANPA NAMA");
 
       return {
-        nama_petugas: finalNamaPPL, kdkab: email, target, h4, h3, h2, h1, h0, totalPendataan: c0,
+        nama_petugas: finalNamaPPL, kdkab: email, target, h4, h3, h2, h1, h0, 
+        totalPendataan: c0, 
+        pendataan: c0, // <- Properti yang hilang
+        submit: totalSubmit, // <- Properti yang hilang
+        draft: totalDraft, // <- Properti yang hilang
+        percentage: baseData.percentage || 0, // <- Biang kerok toFixed
+        percentage_pendataan: baseData.percentage_pendataan || 0, // <- Biang kerok toFixed
         pct4: target > 0 ? (h4 / target) * 100 : 0, pct3: target > 0 ? (h3 / target) * 100 : 0,
         pct2: target > 0 ? (h2 / target) * 100 : 0, pct1: target > 0 ? (h1 / target) * 100 : 0,
         pct0: target > 0 ? (h0 / target) * 100 : 0, pctTotal: target > 0 ? (c0 / target) * 100 : 0, 
@@ -109,17 +110,12 @@ export async function GET() {
       };
     });
 
-    // PERLINDUNGAN CDN CACHE (6 Jam)
     return NextResponse.json(
       { success: true, data: enrichedData, targetHariIni: getTargetHariIni(), lastUpdate },
-      { 
-        headers: { 
-          'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=59' 
-        } 
-      }
+      { headers: { 'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=59' } }
     );
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ success: false, error: 'Gagal mengambil data pendataan' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Gagal mengambil data' }, { status: 500 });
   }
 }
